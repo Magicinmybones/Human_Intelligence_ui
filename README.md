@@ -34,20 +34,27 @@ Animations API — a single coordinated timeline, no animation library.
 
 | Time | Element | Behaviour |
 |------|---------|-----------|
-| 0.00s | Portrait, visor bloom, glass arc | Static — the scene is the stage |
-| 0.05s | Glass rim | Its lit edge comes up along the arc |
+| 0.00s | Portrait, visor bloom | Static — the scene is the stage |
+| 0.05s | Glass arc + lit rim | The surface sweeps its clip edge up into place |
 | 0.26–0.39s | Logo → nav pill → Request Access | Descend from their top anchor |
 | 0.42 / 0.54s | Headline lines | Focus-pull: blur resolves to sharp, small rise |
 | 0.80s | Paragraph | Same focus-pull at supporting scale |
 | 0.96 / 1.03s | Explore Nexa → Discover More | Rise from their baseline |
 | ~1.69s | — | Timeline cancels itself; the page is static |
 
-Three motion behaviours only — surface light-up, focus settle, quiet lift — with
+Three motion behaviours only — surface reveal, focus settle, quiet lift — with
 directions taken from each element's layout anchor. The blur is motivated by the subject:
 the scene is a visor, so type resolving from soft to sharp reads as an optic focusing.
 
 Notes on the implementation:
 
+- The glass arc is revealed by animating its own `clip-path`, never its opacity. An
+  element carrying `backdrop-filter` composites as a group below opacity 1, which makes
+  it flash its unfiltered backdrop — a dark smear across the lower half. Moving only the
+  clip edge keeps the filter fully applied, and leaves the portrait behind it perfectly
+  still. The rim rides the same offset via `--arc-lift` so the lit edge stays welded to
+  the arc, and both clip values are read back from the cascade rather than duplicated in
+  JS, so the authored CSS stays the single source of truth at every breakpoint.
 - Animations target the standalone `translate` and `filter` properties, never
   `transform`, so the authored transforms on `.hero-copy`, `.navigation` and
   `.hero-accent` — including the JS-driven scale variables — are left untouched.

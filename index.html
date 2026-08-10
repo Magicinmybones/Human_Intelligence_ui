@@ -440,8 +440,25 @@
         outline-offset: 3px;
       }
 
-      /* Entrance sequence — initial states only. The class is added by script and
+      /* Entrance sequence — initial states only. The classes are added by script and
          removed once the single master timeline completes; nothing here persists. */
+
+      /* The glass surface is revealed by lowering its own clip edge, never by fading
+         it — an element with backdrop-filter at opacity < 1 composites as a group and
+         would flash its unfiltered backdrop. The rim rides the same offset so the lit
+         edge stays welded to the arc. */
+      :root.arc-armed {
+        --arc-lift: 90px;
+      }
+
+      :root.arc-armed .glass-arc {
+        clip-path: ellipse(92% 62% at 50% calc(119.6% + var(--arc-lift)));
+      }
+
+      :root.arc-armed .glass-rim {
+        translate: 0 var(--arc-lift);
+      }
+
       .is-entering .glass-rim,
       .is-entering .logo,
       .is-entering .nav-links,
@@ -604,6 +621,14 @@
           clip-path: ellipse(92% 70vw at 50% calc(57.6% + 70vw));
         }
 
+        :root.arc-armed {
+          --arc-lift: 60px;
+        }
+
+        :root.arc-armed .glass-arc {
+          clip-path: ellipse(92% 70vw at 50% calc(57.6% + 70vw + var(--arc-lift)));
+        }
+
         .glass-rim {
           top: 57.6%;
           left: -42%;
@@ -723,9 +748,9 @@
       // class is never added, so every element renders in its final state immediately.
       (() => {
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        document.documentElement.classList.add("is-entering");
+        document.documentElement.classList.add("is-entering", "arc-armed");
         window.__entranceFailsafe = window.setTimeout(() => {
-          document.documentElement.classList.remove("is-entering");
+          document.documentElement.classList.remove("is-entering", "arc-armed");
         }, 3000);
       })();
     </script>
@@ -928,8 +953,8 @@
     <script>
       /* MASTER ENTRANCE TIMELINE — runs exactly once on page initialisation.
          Motion language:
-           SURFACE   the glass rim lights up along the arc (the arc itself is scene
-                     artwork and never moves, like the portrait behind it)
+           SURFACE   the glass arc sweeps its clip edge up into place, lit rim welded
+                     to it (the portrait behind it never moves)
            FOCUS     headline / paragraph resolve from soft to sharp (visor optics)
            LIFT      navigation descends from its top anchor, CTAs rise from theirs
          Uses the standalone translate/filter properties so the authored
@@ -975,16 +1000,43 @@
         // timeline reports completion, then is cleared for good.
         const reveal = () => {
           window.clearTimeout(window.__entranceFailsafe);
-          root.classList.remove("is-entering");
+          root.classList.remove("is-entering", "arc-armed");
         };
 
         const run = () => {
           window.clearTimeout(window.__entranceFailsafe);
           window.__entranceFailsafe = window.setTimeout(reveal, 3500);
 
-          // The glass arc itself is scene artwork and stays untouched; only its
-          // lit edge comes up, which reads as the surface catching light.
-          play(q(".glass-rim"), [{ opacity: 0 }, { opacity: 1 }], 0.05, 0.9, SURFACE);
+          // The glass surface arrives first: its clip edge sweeps up into place while
+          // the lit rim rides the same offset and comes up with it. Both clip values
+          // are read back from the cascade — toggling the class between two synchronous
+          // reads costs a style recalc but never paints, so nothing flashes, and the
+          // authored values stay the single source of truth at every breakpoint.
+          const arc = q(".glass-arc");
+          const rim = q(".glass-rim");
+          const lift = parseFloat(getComputedStyle(root).getPropertyValue("--arc-lift"));
+
+          root.classList.remove("arc-armed");
+          const restingClip = getComputedStyle(arc).clipPath;
+          root.classList.add("arc-armed");
+          const liftedClip = getComputedStyle(arc).clipPath;
+          root.classList.remove("arc-armed");
+
+          if (lift && restingClip !== liftedClip) {
+            play(arc, [{ clipPath: liftedClip }, { clipPath: restingClip }], 0.05, 1.05, SURFACE);
+            play(
+              rim,
+              [
+                { opacity: 0, translate: `0 ${lift}px` },
+                { opacity: 1, translate: "0 0" },
+              ],
+              0.05,
+              1.05,
+              SURFACE
+            );
+          } else {
+            play(rim, [{ opacity: 0 }, { opacity: 1 }], 0.05, 0.9, SURFACE);
+          }
 
           // Navigation enters quietly, in reading order, without stealing focus.
           play(q(".logo"), rise(-8 * d), 0.26, 0.62, LIFT);
